@@ -1,5 +1,5 @@
 {
-	"name": "your-module-name",
+	"name": "restream-api",
 	"version": "0.1.0",
 	"main": "main.js",
 	"scripts": {
@@ -8,10 +8,14 @@
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/bitfocus/companion-module-your-module-name.git"
+		"url": "git+https://github.com/bitfocus/companion-module-restream-api.git"
 	},
 	"dependencies": {
-		"@companion-module/base": "~1.0.1"
+		"@companion-module/base": "~1.0.1",
+		"axios": "^1.2.2",
+		"open": "^8.4.0",
+		"server-destroy": "^1.0.1",
+		"simple-oauth2": "^5.0.0"
 	},
 	"devDependencies": {
 		"@companion-module/tools": "^0.5.1"

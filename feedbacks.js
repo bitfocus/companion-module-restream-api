@@ -1,7 +1,17 @@
+const { combineRgb } = require('@companion-module/base')
+
 module.exports = async function (self) {
-	self.setActionDefinitions({
-		ChangeChannelState: {
-			name: 'Change Channel State',
+	console.log('Updating Feedbacks')
+	self.setFeedbackDefinitions({
+		ChannelState: {
+			name: 'Channel State',
+			type: 'boolean',
+			label: 'Channel State',
+			defaultStyle: {
+				bgcolor: combineRgb(255, 0, 0),
+				color: combineRgb(0, 0, 0),
+			},
+
 			options: [
 				{
 					id: 'channel',
@@ -23,8 +33,10 @@ module.exports = async function (self) {
 					default: 'true',
 				},
 			],
-			callback: async (event) => {
-				self.setChannel(event.options)
+			callback: (fb) => {
+				console.log('Checking Feedback')
+				console.log(fb.options.channel)
+				return self.channels.find((ch) => ch.id == fb.options.channel).enabled
 			},
 		},
 	})
