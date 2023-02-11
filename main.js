@@ -3,6 +3,7 @@ const UpgradeScripts = require('./upgrades')
 const UpdateActions = require('./actions')
 const UpdateFeedbacks = require('./feedbacks')
 const UpdateVariables = require('./variables')
+const async = require('async')
 const axios = require('axios')
 const opn = require('open')
 const HttpReceiver = require('./httpListener.js')
@@ -59,17 +60,14 @@ class ModuleInstance extends InstanceBase {
 			}
 		}
 
-		//TODO: Add config variable pollTime
 		this.pollTime = this.config.pollTime ? this.config.pollTime * 1000 : 30000
 		this.timedPoll = this.poll.bind(this)
-		this.poll_interval = setInterval(this.timedPoll, this.pollTime) //ms for poll
+		if(this.pollTime > 0) {
+			this.poll_interval = setInterval(this.timedPoll, this.pollTime) //ms for poll
+		}
 
 		//Wait for a poll to complete
 		await this.poll()
-
-		//Update Actions and Feedbacks
-		this.updateActions()
-		this.updateFeedbacks()
 	}
 
 	// When module gets deleted
@@ -105,9 +103,11 @@ class ModuleInstance extends InstanceBase {
 		this.updateStatus(InstanceStatus.Ok)
 
 		//Reset poll interval incase value changed
-		this.pollTime = this.config.pollTime ? this.config.pollTime * 1000 : 30000
 		clearInterval(this.poll_interval)
-		this.poll_interval = setInterval(this.poll, this.pollTime) //ms for poll
+		this.pollTime = this.config.pollTime ? this.config.pollTime * 1000 : 30000
+		if(this.pollTime > 0) {
+			this.poll_interval = setInterval(this.timedPoll, this.pollTime) //ms for poll
+		}
 
 		//Manually Retrigger Poll
 		await this.poll()
@@ -123,6 +123,13 @@ class ModuleInstance extends InstanceBase {
 	// Return config fields for web config
 	getConfigFields() {
 		return [
+			{
+				type: 'textinput',
+				id: 'pollTime',
+				label: 'Poll Interval (seconds)',
+				width: 3,
+				regex: Regex.NUMBER,
+			},
 			{
 				type: 'textinput',
 				id: 'clientID',
@@ -201,19 +208,24 @@ class ModuleInstance extends InstanceBase {
 		this.platforms = await this.getPlatforms()
 		this.channels = await this.getChannels()
 
-		//Retrieve meta (titles and descriptions) for each channel
-		await Promise.all(
-			this.channels.map(async (channel) => {
-				channel.meta = await this.getChannelMeta(channel.id)
-			})
-		)
+		//Retrieve meta for each channel in parallel
+		await async.each(this.channels, async channel => {
+			channel.meta = await this.getChannelMeta(channel.id)
+		}).then(() => {
+			//Update Feedbacks
+			this.updateFeedbacks()
 
-		//Update Variables
-		this.updateVariables()
+			//Check Feedbacks
+			this.checkFeedbacks()
 
-		//Check Feedbacks
-		this.checkFeedbacks()
-		this.pollInProgress = false
+			//Update Actions
+			this.updateActions()
+
+			//Update Variables
+			this.updateVariables()
+		}).finally(() => {
+			this.pollInProgress = false
+		})	
 	}
 
 	//Checks that needed configuration values are present
@@ -324,7 +336,14 @@ class ModuleInstance extends InstanceBase {
 			url: `/user/channel-meta/${channelID}`,
 		}
 
-		const meta = await this.apiWrapper(reqconfig)
+		var meta = {};
+
+		try{
+			meta = await this.apiWrapper(reqconfig)
+		} catch (error) {
+			console.log('Error getting channel meta:', error)
+		}
+
 		return meta
 	}
 
@@ -388,7 +407,7 @@ class ModuleInstance extends InstanceBase {
 	}
 
 	async RunRefreshFlow() {
-		if (this.isAlreadyFetchingAccessToken) {
+		if (this._refreshFlowRunning) {
 			//TODO: If it is already running, but immediately returns, the API may retry the request before the refreshFlow Completes
 			console.log('Already attempting to refresh Token')
 			return
@@ -407,31 +426,19 @@ class ModuleInstance extends InstanceBase {
 		}
 
 		console.log('Fetching new access Token')
-		this.isAlreadyFetchingAccessToken = true
+		this._refreshFlowRunning = true
 		const params = new URLSearchParams()
 		params.append('grant_type', 'refresh_token')
 		params.append('refresh_token', this.config.refreshToken)
 
-		await axios
+		var response = await axios
 			.post('https://api.restream.io/oauth/token', params, {
 				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 				auth: {
 					username: this.config.clientID,
 					password: this.config.clientSecret,
 				},
-			})
-			.then((response) => {
-				this.log('info', 'Refresh Token Success, saving tokens')
-				this.config.accessToken = response.data.accessToken
-				this.config.refreshToken = response.data.refreshToken
-				this.saveConfig(this.config)
-
-				//Set api client auth header to new token
-				this.api.headers['Authorization'] = `Bearer ${this.config.accessToken}`
-				this.updateStatus(InstanceStatus.Ok)
-				return true
-			})
-			.catch((err) => {
+			}).catch((err) => {
 				if (err.response) {
 					// The client was given an error response (5xx, 4xx)
 					console.log(err.response.data)
@@ -452,8 +459,22 @@ class ModuleInstance extends InstanceBase {
 					this.updateStatus(InstanceStatus.UnknownError, 'Unknown Error')
 				}
 			})
-		this.isAlreadyFetchingAccessToken = false
-		return false
+		if(response.status != 200) {
+			this.log('error', 'Unable to refresh token')
+			this._refreshFlowRunning = false
+			return false
+		}
+
+		this.log('info', 'Refresh Token Success, saving tokens')
+		this.config.accessToken = response.data.accessToken
+		this.config.refreshToken = response.data.refreshToken
+		this.saveConfig(this.config)
+
+		//Set api client auth header to new token
+		this.api.headers['Authorization'] = `Bearer ${this.config.accessToken}`
+		this.updateStatus(InstanceStatus.Ok)
+		return true
+
 	}
 
 	async apiWrapper(reqconfig) {

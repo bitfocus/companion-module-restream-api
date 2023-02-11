@@ -12,6 +12,7 @@
 	},
 	"dependencies": {
 		"@companion-module/base": "~1.0.1",
+		"async": "^3.2.4",
 		"axios": "^1.2.2",
 		"open": "^8.4.0",
 		"server-destroy": "^1.0.1",
