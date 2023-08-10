@@ -11,15 +11,14 @@
 		"url": "git+https://github.com/bitfocus/companion-module-restream-api.git"
 	},
 	"dependencies": {
-		"@companion-module/base": "~1.0.1",
+		"@companion-module/base": "~1.4.1",
 		"async": "^3.2.4",
-		"axios": "^1.2.2",
+		"axios": "^1.4.0",
 		"open": "^8.4.0",
-		"server-destroy": "^1.0.1",
-		"simple-oauth2": "^5.0.0"
+		"server-destroy": "^1.0.1"
 	},
 	"devDependencies": {
-		"@companion-module/tools": "^0.5.1"
+		"@companion-module/tools": "^1.3.2"
 	},
 	"prettier": "@companion-module/tools/.prettierrc.json"
 }
