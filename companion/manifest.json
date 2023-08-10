@@ -5,8 +5,8 @@
 	"description": "Update Channel Configuration via the Restream API",
 	"version": "0.0.0",
 	"license": "MIT",
-	"repository": "git+https://github.com/bitfocus/companion-module-your-module-name.git",
-	"bugs": "https://github.com/bitfocus/companion-module-your-module-name/issues",
+	"repository": "git+https://github.com/bitfocus/companion-module-restream-api.git",
+	"bugs": "https://github.com/bitfocus/companion-module-restream-api/issues",
 	"maintainers": [
 		{
 			"name": "Quinn Matthews",
