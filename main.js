@@ -6,7 +6,7 @@ const UpdateVariables = require('./variables')
 const async = require('async')
 const axios = require('axios')
 const opn = require('open')
-const HttpReceiver = require('./httpListener.js')
+
 class ModuleInstance extends InstanceBase {
 	constructor(internal) {
 		super(internal)
@@ -62,7 +62,7 @@ class ModuleInstance extends InstanceBase {
 
 		this.pollTime = this.config.pollTime ? this.config.pollTime * 1000 : 30000
 		this.timedPoll = this.poll.bind(this)
-		if(this.pollTime > 0) {
+		if (this.pollTime > 0) {
 			this.poll_interval = setInterval(this.timedPoll, this.pollTime) //ms for poll
 		}
 
@@ -88,14 +88,9 @@ class ModuleInstance extends InstanceBase {
 			config.authURL = `https://api.restream.io/login?response_type=code&client_id=${config.clientID}&redirect_uri=${config.redirectURL}&state=state`
 			this.saveConfig(config)
 
-			await this.RunAuthFlow()
+			this.RunAuthFlow()
 
-			//recheck authentication status
-			if (!(await this.checkAuthenticationStatus())) {
-				//Authentication failed
-				console.log('Authentication still bad')
-				return
-			}
+			return
 		}
 
 		//Authentication status good
@@ -105,7 +100,7 @@ class ModuleInstance extends InstanceBase {
 		//Reset poll interval incase value changed
 		clearInterval(this.poll_interval)
 		this.pollTime = this.config.pollTime ? this.config.pollTime * 1000 : 30000
-		if(this.pollTime > 0) {
+		if (this.pollTime > 0) {
 			this.poll_interval = setInterval(this.timedPoll, this.pollTime) //ms for poll
 		}
 
@@ -128,6 +123,7 @@ class ModuleInstance extends InstanceBase {
 				id: 'pollTime',
 				label: 'Poll Interval (seconds)',
 				width: 3,
+				default: 30,
 				regex: Regex.NUMBER,
 			},
 			{
@@ -149,6 +145,7 @@ class ModuleInstance extends InstanceBase {
 				id: 'redirectURL',
 				label: 'Redirect URL',
 				width: 8,
+				default: 'https://bitfocus.github.io/companion-oauth/callback',
 				regex: Regex.SOMETHING,
 			},
 			{
@@ -170,6 +167,65 @@ class ModuleInstance extends InstanceBase {
 				width: 12,
 			},
 		]
+	}
+
+	async handleHttpRequest(request) {
+		if (request.path === '/oauth/callback') {
+			const authCode = request.query['code']
+			if (!authCode) {
+				return {
+					status: 400,
+					body: 'Missing auth code!',
+				}
+			}
+
+			if (!this.config.clientID || !this.config.clientSecret || !this.config.redirectURL) {
+				return {
+					status: 400,
+					body: 'Missing required config fields!',
+				}
+			}
+
+			try {
+				//Exchange code for token
+				const params = new URLSearchParams()
+				params.append('grant_type', 'authorization_code')
+				params.append('redirect_uri', this.config.redirectURL)
+				params.append('code', authCode)
+
+				const response = await axios.post('https://api.restream.io/oauth/token', params, {
+					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+					auth: {
+						username: this.config.clientID,
+						password: this.config.clientSecret,
+					},
+				})
+				if (response.status == 200) {
+					//Save new values to Configuration
+					this.log('info', 'Authentication Success, saving tokens')
+					this.config.accessToken = response.data.accessToken
+					this.config.refreshToken = response.data.refreshToken
+					this.saveConfig(this.config)
+
+					this.configUpdated(this.config)
+				}
+			} catch (err) {
+				this.log('debug', `Failed to get access token: ${err?.message ?? err?.toString()}`)
+				return {
+					status: 500,
+					body: `Failed to authenticate\n${err?.message ?? err?.toString()}`,
+				}
+			}
+
+			return {
+				status: 200,
+				body: 'Success!\nYou can close this tab',
+			}
+		}
+
+		return {
+			status: 404,
+		}
 	}
 
 	updateActions() {
@@ -209,23 +265,26 @@ class ModuleInstance extends InstanceBase {
 		this.channels = await this.getChannels()
 
 		//Retrieve meta for each channel in parallel
-		await async.each(this.channels, async channel => {
-			channel.meta = await this.getChannelMeta(channel.id)
-		}).then(() => {
-			//Update Feedbacks
-			this.updateFeedbacks()
+		await async
+			.each(this.channels, async (channel) => {
+				channel.meta = await this.getChannelMeta(channel.id)
+			})
+			.then(() => {
+				//Update Feedbacks
+				this.updateFeedbacks()
 
-			//Check Feedbacks
-			this.checkFeedbacks()
+				//Check Feedbacks
+				this.checkFeedbacks()
 
-			//Update Actions
-			this.updateActions()
+				//Update Actions
+				this.updateActions()
 
-			//Update Variables
-			this.updateVariables()
-		}).finally(() => {
-			this.pollInProgress = false
-		})	
+				//Update Variables
+				this.updateVariables()
+			})
+			.finally(() => {
+				this.pollInProgress = false
+			})
 	}
 
 	//Checks that needed configuration values are present
@@ -336,9 +395,9 @@ class ModuleInstance extends InstanceBase {
 			url: `/user/channel-meta/${channelID}`,
 		}
 
-		var meta = {};
+		var meta = {}
 
-		try{
+		try {
 			meta = await this.apiWrapper(reqconfig)
 		} catch (error) {
 			console.log('Error getting channel meta:', error)
@@ -370,40 +429,13 @@ class ModuleInstance extends InstanceBase {
 		return key
 	}
 
-	async RunAuthFlow() {
-		const authorizationUri = `https://api.restream.io/login?response_type=code&client_id=${this.config.clientID}&redirect_uri=${this.config.redirectURL}&state=state`
+	RunAuthFlow() {
+		const authorizationUri = `https://api.restream.io/login?response_type=code&client_id=${this.config.clientID}&redirect_uri=${this.config.redirectURL}&state=${this.id}`
 
-		//Config for local http server to recieve code
-		//TODO: Load from config?
-		var CallbackServer = new HttpReceiver('localhost', 8081)
 		this.config.authURL = authorizationUri
-		//Send User to AuthUri and wait to recieve code
+		this.saveConfig(this.config)
 
-		const code = await CallbackServer.getCode(() => {
-			opn(authorizationUri, { wait: false }).then((cp) => cp.unref())
-		})
-
-		//Exchange code for token
-		const params = new URLSearchParams()
-		params.append('grant_type', 'authorization_code')
-		params.append('redirect_uri', this.config.redirectURL)
-		params.append('code', code)
-
-		const response = await axios.post('https://api.restream.io/oauth/token', params, {
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-			auth: {
-				username: this.config.clientID,
-				password: this.config.clientSecret,
-			},
-		})
-		if (response.status == 200) {
-			//Save new values to Configuration
-			this.log('info', 'Authentication Success, saving tokens')
-			this.config.accessToken = response.data.accessToken
-			this.config.refreshToken = response.data.refreshToken
-			this.saveConfig(this.config)
-		}
-		console.log(this.config)
+		opn(authorizationUri, { wait: false }).then((cp) => cp.unref())
 	}
 
 	async RunRefreshFlow() {
@@ -438,7 +470,8 @@ class ModuleInstance extends InstanceBase {
 					username: this.config.clientID,
 					password: this.config.clientSecret,
 				},
-			}).catch((err) => {
+			})
+			.catch((err) => {
 				if (err.response) {
 					// The client was given an error response (5xx, 4xx)
 					console.log(err.response.data)
@@ -459,7 +492,7 @@ class ModuleInstance extends InstanceBase {
 					this.updateStatus(InstanceStatus.UnknownError, 'Unknown Error')
 				}
 			})
-		if(response.status != 200) {
+		if (response.status != 200) {
 			this.log('error', 'Unable to refresh token')
 			this._refreshFlowRunning = false
 			return false
@@ -474,7 +507,6 @@ class ModuleInstance extends InstanceBase {
 		this.api.headers['Authorization'] = `Bearer ${this.config.accessToken}`
 		this.updateStatus(InstanceStatus.Ok)
 		return true
-
 	}
 
 	async apiWrapper(reqconfig) {
