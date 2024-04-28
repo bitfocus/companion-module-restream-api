@@ -267,6 +267,10 @@ class ModuleInstance extends InstanceBase {
 		//Retrieve meta for each channel in parallel
 		await async
 			.each(this.channels, async (channel) => {
+				// Skip if channel is Custom RTMP (channel.streamingPlatformId == 29)
+				if (channel.streamingPlatformId == 29) return
+
+				//Get Channel Meta
 				channel.meta = await this.getChannelMeta(channel.id)
 			})
 			.then(() => {
