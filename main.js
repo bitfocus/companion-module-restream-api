@@ -483,8 +483,6 @@ class ModuleInstance extends InstanceBase {
 					console.log(err.response.headers)
 					if (err.response.status == 400) {
 						this.log('error', 'Refresh Token Expired, please reauthenticate')
-						this.config.accessToken = undefined
-						this.config.refreshToken = undefined
 						this.updateStatus(InstanceStatus.BadConfig, 'Refresh Token Expired')
 						this.saveConfig(this.config)
 					}
