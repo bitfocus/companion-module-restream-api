@@ -14,10 +14,10 @@
 		}
 	],
 	"runtime": {
-		"type": "node18",
+		"type": "node20",
 		"api": "nodejs-ipc",
 		"apiVersion": "0.0.0",
-		"entrypoint": "../main.js"
+		"entrypoint": "./main.js"
 	},
 	"legacyIds": [],
 	"manufacturer": "Restream",
