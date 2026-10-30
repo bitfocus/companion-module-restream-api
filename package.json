@@ -15,6 +15,11 @@
 		"@companion-module/base": "~1.11.0",
 		"axios": "^1.7.0",
 		"open": "^8.4.0"
+		"@companion-module/base": "~1.4.1",
+		"async": "^3.2.4",
+		"axios": "^1.20.0",
+		"open": "^8.4.0",
+		"server-destroy": "^1.0.1"
 	},
 	"devDependencies": {
 		"@companion-module/tools": "^2.8.0"
