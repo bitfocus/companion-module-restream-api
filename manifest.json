@@ -1,0 +1,26 @@
+{
+	"id": "restream-api",
+	"name": "restream-api",
+	"shortname": "restream",
+	"description": "Control channels and monitor real-time stream status via the Restream API",
+	"version": "1.0.5",
+	"license": "MIT",
+	"repository": "git+https://github.com/bitfocus/companion-module-restream-api.git",
+	"bugs": "https://github.com/bitfocus/companion-module-restream-api/issues",
+	"maintainers": [
+		{
+			"name": "Bitfocus AS",
+			"email": "support@bitfocus.io"
+		}
+	],
+	"runtime": {
+		"type": "node20",
+		"api": "nodejs-ipc",
+		"apiVersion": "0.0.0",
+		"entrypoint": "./main.js"
+	},
+	"legacyIds": [],
+	"manufacturer": "Restream",
+	"products": ["API", "Studio", "Multistreaming"],
+	"keywords": ["streaming", "multistream", "restream", "broadcast", "live", "channels", "monitoring"]
+}
