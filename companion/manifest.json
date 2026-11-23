@@ -14,7 +14,10 @@
 		}
 	],
 	"runtime": {
-		"type": "node18",
+		"type": "node26",
+		"permissions": {
+			"child-process": true
+		},
 		"api": "nodejs-ipc",
 		"apiVersion": "0.0.0",
 		"entrypoint": "../main.js"
